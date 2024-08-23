@@ -1,7 +1,7 @@
 let mapleader = " "
 let g:netrw_banner = 0
 let g:netrw_liststyle = 3
-let g:netrw_winsize = 25
+"let g:netrw_winsize = 25
 let g:netrw_preview = 1
 
 syntax on
@@ -58,39 +58,54 @@ set undodir=/tmp/nvim/
 set splitbelow
 set splitright
 
-colorscheme sorbet
-
 filetype off
 set rtp+=/home/raman/.vim/bundle/Vundle.vim/
 call vundle#begin()
+  "Package management
   Plugin 'VundleVim/Vundle.vim'
+
+  " Programming Languages
   Plugin 'elixir-editors/vim-elixir'
   Plugin 'pangloss/vim-javascript'
   Plugin 'mxw/vim-jsx'
   Plugin 'kchmck/vim-coffee-script'
+
+  "Zen Mode
+  Plugin 'folke/zen-mode.nvim'
+
+  "Matchit Functionality
+  Plugin 'andymass/vim-matchup'
+
+  "File Navigation
   Plugin 'junegunn/fzf'
   Plugin 'junegunn/fzf.vim'
   Plugin 'preservim/nerdtree'
-  Plugin 'embear/vim-localvimrc'
+
+  "Theme Configuration
+  Plugin 'catppuccin/nvim'
+
+  "Treesitter Configuration"
   Plugin 'nvim-treesitter/nvim-treesitter'
   Plugin 'nvim-treesitter/nvim-treesitter-textobjects'
+
+  " LSP Configuration
+  Plugin 'neovim/nvim-lspconfig'
 call vundle#end()
 filetype indent plugin on
-runtime  macros/matchit.vim
-
-" Set localvimrc to .vimrc
-let g:localvimrc_name = '.vimrc'
-let g:localvimrc_ask = 0
-
+"runtime  macros/matchit.vim
+packadd! matchit
 
 " Set syntax of hamlc files to haml
 au BufNewFile,BufRead *.hamlc set ft=haml
 
 match ExtraWhitespace /\s\+$/
 
+" Set colorscheme
+colorscheme catppuccin-mocha
 " when in diff mode set colorscheme to industry
+
 if &diff
-  colorscheme industry
+  colorscheme catppuccin-mocha
 endif
 
 " setup markdown to fold by indentation
@@ -231,8 +246,8 @@ endfunction!
 
 
 function! GitAdd(...)
-  let target_file=@%
-  let job = job_start('git add ' . expand(target_file))
+  let target_file= expand('%')
+  execute 'silent' '!' 'git' 'add' target_file
 endfunction
 
 function! SetupMarkdownFolding()
@@ -406,6 +421,7 @@ command!FormatJSON call FormatJSON()
 command!FormatSQL call FormatSQL()
 command!FormatXML call FormatXML()
 command!Ctags call Ctags()
+command!GitAdd call GitAdd()
 
 
 " normal mode remappings
@@ -447,11 +463,20 @@ onoremap <silent> a/ :<C-u> call SelectAroundMatchingPattern('/')<cr>
 ""---Insert mode mappings
 
 "Quickly insert ruby method
-inoremap <C-@>d def<cr>end<Esc>kA<space>
-inoremap <C-@>c class<cr>end<Esc>kA<space>
-inoremap <C-@>m module<cr>end<Esc>kA<space>
-inoremap <C-@>b <space>do<cr>end<Esc>kA
-inoremap <F5> <C-R>=strftime("%c")<cr>-
+"inoremap <C-@>d def<cr>end<Esc>kA<space>
+"inoremap <C-@>c class<cr>end<Esc>kA<space>
+"inoremap <C-@>m module<cr>end<Esc>kA<space>
+"inoremap <C-@>b <space>do<cr>end<Esc>kA
+"inoremap <F5> <C-R>=strftime("%c")<cr>-
+lua <<EOF
+vim.api.nvim_set_keymap('i', '<C-Space>d', 'def\nend<Esc>kA ', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('i', '<C-Space>c', 'class\nend<Esc>kA ', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('i', '<C-Space>m', 'module\nend<Esc>kA ', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('i', '<C-Space>b', ' do\nend<Esc>kA', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('i', '<F5>', '<C-R>=strftime("%c")<CR>-', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('i', '<C-Space>l', 'console.log()<Esc>i', { noremap = true, silent = true })
+EOF
+
 
 "Treesitter Config
 lua <<EOF
@@ -502,6 +527,10 @@ require'nvim-treesitter.configs'.setup {
         ["ac"] = "@class.outer",
         ["ic"] = "@class.inner",
         ["as"] = "@scope",
+        ["ab"] = "@block.outer",
+        ["ib"] = "@block.inner",
+        ["al"] = "@loop.outer",
+        ["il"] = "@loop.inner",
       },
 
       -- You can choose the select mode (default is charwise 'v')
@@ -527,6 +556,42 @@ require'nvim-treesitter.configs'.setup {
       -- and should return true or false
       include_surrounding_whitespace = false,
     },
+    move = {
+      enable = true,
+      set_jumps = true,
+      goto_next_start = {
+        ["]b"] = "@block.outer",
+      },
+      goto_next_end = {
+        ["]B"] = "@block.outer",
+      },
+
+    },
+    matchup = {
+      enable = true,
+    },
   },
 }
+EOF
+
+" LSP Configuration
+lua <<EOF
+local function lsp_keymaps(bufnr)
+  local opts = { noremap = true, silent = true }
+
+  vim.api.nvim_buf_set_keymap(bufnr, 'n', 'grn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts)
+  vim.api.nvim_buf_set_keymap(bufnr, 'n', 'gra', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
+  vim.api.nvim_buf_set_keymap(bufnr, 'n', 'grr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
+
+  vim.api.nvim_buf_set_keymap(bufnr, 'n', 'gra', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
+  
+  vim.api.nvim_buf_set_keymap(bufnr, 'i', '<C-S>', '<cmd>lua vim.lsp.buf.signature_help()<CR>', opts)
+end
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(args)
+    local bufnr = args.buf
+    lsp_keymaps(bufnr)
+  end,
+})
 EOF
