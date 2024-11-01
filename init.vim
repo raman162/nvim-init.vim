@@ -69,6 +69,7 @@ call vundle#begin()
   Plugin 'pangloss/vim-javascript'
   Plugin 'mxw/vim-jsx'
   Plugin 'kchmck/vim-coffee-script'
+  Plugin 'vim-ruby/vim-ruby'
 
   "Zen Mode
   Plugin 'folke/zen-mode.nvim'
@@ -87,9 +88,13 @@ call vundle#begin()
   "Treesitter Configuration"
   Plugin 'nvim-treesitter/nvim-treesitter'
   Plugin 'nvim-treesitter/nvim-treesitter-textobjects'
+  Plugin 'nvim-treesitter/nvim-treesitter-context'
 
   " LSP Configuration
   Plugin 'neovim/nvim-lspconfig'
+
+  " Undo Tree
+  Plugin 'mbbill/undotree'
 call vundle#end()
 filetype indent plugin on
 "runtime  macros/matchit.vim
@@ -304,46 +309,66 @@ function! GoToRailsRspec()
 endfunction
 
 function! RunLastSpecCommand()
-  execute g:last_spec_command
+  call ExecuteSpecCommmand(g:last_spec_command)
 endfunction
 
 function! ExecuteSpecCommmand(command)
   call SetLastSpecCommand(a:command)
-  execute a:command
+  let command_to_execute = GenerateSpecExecutionCommand(a:command)
+  execute command_to_execute
+endfunction
+
+function! GenerateSpecExecutionCommand(command)
+  let rspec_entrypoint = GetRspecEntryPoint()
+  if rspec_entrypoint[0] == '!'
+    return rspec_entrypoint . " " . shellescape(a:command) . ' C-m'
+  else
+    return rspec_entrypoint . " " . a:command
+  endif
 endfunction
 
 function! SetLastSpecCommand(command)
   let g:last_spec_command = a:command
 endfunction
 
+function! SetSpecExecutionMode(command)
+  let g:rspec_entrypoint = a:command
+endfunction
+
+function! SetRspecCommand(command)
+  let g:rspec_command = a:command
+endfunction[
+
+function! GetRspecEntryPoint()
+  return get(g:, 'rspec_entrypoint', "bel term")
+endfunction
+
 function! RunAllSpecs()
-  let command =  "bel term " . RspecCommand()
-  call ExecuteSpecCommmand(command)
+  call ExecuteSpecCommmand(RspecCommand())
 endfunction
 
 function! RunAllFailures()
-  let command = "bel term " . RspecCommand() . " --only-failures"
+  let command = RspecCommand() . " --only-failures"
   call ExecuteSpecCommmand(command)
 endfunction
 
 function! RunRailsRspec()
-  let command = "bel term " . RspecCommand() . " " . SpecFile()
+  let command = RspecCommand() . " " . SpecFile()
   call ExecuteSpecCommmand(command)
 endfunction
 
 function! RspecCommand()
-  let g:rspec_command = get(g:, 'rspec_command', "bundle exec rspec")
-  return g:rspec_command
+  return get(g:, 'rspec_command', "bundle exec rspec")
 endfunction
 
 function! RunRailsRspecFailure()
-  let command = "bel term " . RspecCommand() . " " . SpecFile() . " --only-failures"
+  let command = RspecCommand() . " " . SpecFile() . " --only-failures"
   call ExecuteSpecCommmand(command)
 endfunction
 
 function! RunNearSpec()
   let near_spec = SpecFile() . ":" . line(".")
-  let command = "bel term " . RspecCommand() . " " . near_spec
+  let command = RspecCommand() . " " . near_spec
   call ExecuteSpecCommmand(command)
 endfunction
 
@@ -497,6 +522,9 @@ require'nvim-treesitter.configs'.setup {
   highlight = {
     enable = true,
     disable = function(lang, buf)
+      if lang == "gitcommit" then
+        return true
+      end
       local max_filesize = 512 * 1024
       local ok, stats = pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
       if ok and stats and stats.size > max_filesize then
